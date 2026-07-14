@@ -13,8 +13,8 @@ import "dotenv/config";
 const {
   HEYGEN_API_KEY,
   DATA_API_URL,
-  HEYGEN_AVATAR_ID = "Daisy-inskirt-20220818",
-  HEYGEN_VOICE_ID = "2d5b0e6cf36f460aa7fc47e3eee4ba54",
+  HEYGEN_AVATAR_ID = "30973494479f4bbd944026f2fbb981c4",
+  HEYGEN_VOICE_ID = "330290724a1b470fb63153f34d4c0183",
   PORT = 3000,
 } = process.env;
 
