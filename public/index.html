@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Data Feed Avatar — HeyGen</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 1rem; }
+    button { padding: .6rem 1.2rem; font-size: 1rem; cursor: pointer; }
+    #status { margin: 1rem 0; color: #555; }
+    video { width: 100%; border-radius: 12px; background: #000; }
+    textarea { width: 100%; min-height: 80px; margin-top: 1rem; font-family: inherit; }
+  </style>
+</head>
+<body>
+  <h1>Data Feed Avatar</h1>
+  <p>
+    Click the button to fetch the latest data from your API, turn it into a
+    spoken script, and render a HeyGen avatar video narrating it.
+  </p>
+  <button id="go">Narrate latest data</button>
+  <div id="status"></div>
+  <video id="player" controls hidden></video>
+  <h3>Script used</h3>
+  <textarea id="script" readonly placeholder="The generated narration script appears here"></textarea>
+
+  <script>
+    const status = (msg) => (document.getElementById("status").textContent = msg);
+
+    document.getElementById("go").addEventListener("click", async () => {
+      status("Fetching your data feed and submitting the render…");
+      const res = await fetch("/api/narrate", { method: "POST" });
+      const body = await res.json();
+      if (!res.ok) return status("Error: " + JSON.stringify(body.error));
+
+      document.getElementById("script").value = body.script;
+      status("Rendering video (this typically takes 1–3 minutes)…");
+
+      // Poll until HeyGen finishes rendering. For production, register a
+      // webhook (avatar_video.success) instead of polling.
+      const poll = setInterval(async () => {
+        const s = await fetch("/api/narrate/" + body.video_id).then((r) => r.json());
+        if (s.status === "completed") {
+          clearInterval(poll);
+          const player = document.getElementById("player");
+          player.src = s.video_url;
+          player.hidden = false;
+          player.play();
+          status("Done.");
+        } else if (s.status === "failed") {
+          clearInterval(poll);
+          status("Render failed: " + JSON.stringify(s.error));
+        } else {
+          status("Status: " + s.status + "…");
+        }
+      }, 5000);
+    });
+  </script>
+</body>
+</html>
