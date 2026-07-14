@@ -7,37 +7,55 @@
   <style>
     body { font-family: system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 1rem; }
     button { padding: .6rem 1.2rem; font-size: 1rem; cursor: pointer; }
-    #status { margin: 1rem 0; color: #555; }
-    video { width: 100%; border-radius: 12px; background: #000; }
-    textarea { width: 100%; min-height: 80px; margin-top: 1rem; font-family: inherit; }
+    #status { margin: 1rem 0; color: #555; min-height: 1.2em; }
+    video { width: 100%; border-radius: 12px; background: #000; margin-top: 1rem; }
+    textarea { width: 100%; min-height: 80px; margin-top: .5rem; font-family: inherit; font-size: 1rem; }
+    .row { display: flex; gap: .6rem; flex-wrap: wrap; margin-top: .5rem; }
+    .hint { color: #777; font-size: .9rem; }
   </style>
 </head>
 <body>
   <h1>Data Feed Avatar</h1>
-  <p>
-    Click the button to fetch the latest data from your API, turn it into a
-    spoken script, and render a HeyGen avatar video narrating it.
+
+  <h3>1. Type any text to test your avatar</h3>
+  <p class="hint">
+    Use this to confirm your API key, avatar, and voice all work — no data feed needed.
   </p>
-  <button id="go">Narrate latest data</button>
+  <textarea id="script" placeholder="e.g. Hello! This is a test of my HeyGen data avatar.">Hello! This is a test of my HeyGen data avatar. If you can hear me, everything is working.</textarea>
+  <div class="row">
+    <button id="speak">Render avatar saying this</button>
+  </div>
+
+  <h3 style="margin-top:2rem">2. Or narrate your live data feed</h3>
+  <p class="hint">
+    Requires <code>DATA_API_URL</code> set in your <code>.env</code>. Fetches your API,
+    builds a script automatically, and narrates it.
+  </p>
+  <div class="row">
+    <button id="go">Narrate latest data</button>
+  </div>
+
   <div id="status"></div>
   <video id="player" controls hidden></video>
-  <h3>Script used</h3>
-  <textarea id="script" readonly placeholder="The generated narration script appears here"></textarea>
 
   <script>
     const status = (msg) => (document.getElementById("status").textContent = msg);
 
-    document.getElementById("go").addEventListener("click", async () => {
-      status("Fetching your data feed and submitting the render…");
-      const res = await fetch("/api/narrate", { method: "POST" });
+    async function render(payload) {
+      status("Submitting the render to HeyGen…");
+      document.getElementById("player").hidden = true;
+      const res = await fetch("/api/narrate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
       const body = await res.json();
       if (!res.ok) return status("Error: " + JSON.stringify(body.error));
 
       document.getElementById("script").value = body.script;
-      status("Rendering video (this typically takes 1–3 minutes)…");
+      status("Rendering video (this usually takes 1–3 minutes)…");
 
-      // Poll until HeyGen finishes rendering. For production, register a
-      // webhook (avatar_video.success) instead of polling.
+      // Poll until HeyGen finishes. In production, use a webhook instead.
       const poll = setInterval(async () => {
         const s = await fetch("/api/narrate/" + body.video_id).then((r) => r.json());
         if (s.status === "completed") {
@@ -46,15 +64,25 @@
           player.src = s.video_url;
           player.hidden = false;
           player.play();
-          status("Done.");
+          status("Done — your avatar video is ready.");
         } else if (s.status === "failed") {
           clearInterval(poll);
           status("Render failed: " + JSON.stringify(s.error));
         } else {
-          status("Status: " + s.status + "…");
+          status("Status: " + s.status + "… (still rendering)");
         }
       }, 5000);
+    }
+
+    // Button 1: speak whatever is typed in the box.
+    document.getElementById("speak").addEventListener("click", () => {
+      const text = document.getElementById("script").value.trim();
+      if (!text) return status("Type some text first.");
+      render({ script: text });
     });
+
+    // Button 2: fetch the data feed and narrate it (needs DATA_API_URL).
+    document.getElementById("go").addEventListener("click", () => render({}));
   </script>
 </body>
 </html>
